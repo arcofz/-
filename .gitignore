@@ -1,0 +1,29 @@
+# Java
+target/
+*.class
+*.jar
+!.mvn/wrapper/maven-wrapper.jar
+
+# Node
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# 环境变量
+.env
+.env.*
+!.env.example
+application-local.yml
+
+# 系统
+.DS_Store
+Thumbs.db
+
+# 日志
+*.log
