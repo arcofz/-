@@ -65,6 +65,8 @@ npm run dev
 - 提交信息：`feat: 发布失物接口`、`fix: 重复认领校验`。
 - 合并前至少自测主流程。
 
+完整流程、分工提交内容和 PR 检查见 `CONTRIBUTING.md`。
+
 ## 文档
 
 - 接口契约：`docs/api.md`
