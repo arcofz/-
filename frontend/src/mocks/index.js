@@ -81,6 +81,7 @@ const enrichItem = (item) => {
   return {
     ...item,
     publisherName: user ? user.name : '',
+    publisherContact: user ? user.contact : '',
     categoryName: cat ? cat.name : '',
     locationName: loc ? (loc.floor ? `${loc.building} ${loc.floor}` : loc.building) : ''
   }
