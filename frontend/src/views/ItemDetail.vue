@@ -41,9 +41,10 @@
                 <el-button
                   v-if="!isOwner && auth.isLoggedIn && item.type === 'found' && ['pending', 'matched', 'claimed'].includes(item.status)"
                   type="success"
+                  :disabled="claimed"
                   @click="claimDialogVisible = true"
                 >
-                  我要认领
+                  {{ claimed ? '已申请' : '我要认领' }}
                 </el-button>
               </div>
             </div>
@@ -85,6 +86,7 @@ const item = ref(null)
 const claimDialogVisible = ref(false)
 const claimEvidence = ref('')
 const claimSubmitting = ref(false)
+const claimed = ref(false)
 
 const isOwner = computed(() => auth.user && item.value && Number(item.value.userId) === Number(auth.user.id))
 
@@ -122,11 +124,18 @@ const onClaim = async () => {
   claimSubmitting.value = true
   try {
     await createClaim({ itemId: item.value.id, evidence: claimEvidence.value.trim() })
+    claimed.value = true
     ElMessage.success('认领申请已提交，等待发布者审核')
     claimDialogVisible.value = false
     claimEvidence.value = ''
   } catch (e) {
-    ElMessage.error(e.message || '提交失败')
+    // 409：该物品已有本人的认领申请，同步按钮状态防止重复提交
+    if (e.code === 409) {
+      claimed.value = true
+      ElMessage.info(e.message || '你已经提交过认领申请')
+    } else {
+      ElMessage.error(e.message || '提交失败')
+    }
   } finally {
     claimSubmitting.value = false
   }

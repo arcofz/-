@@ -31,7 +31,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { getItems } from '../api/items'
+import { getItems, normalizePage } from '../api/items'
 import ItemCard from '../components/ItemCard.vue'
 
 const loading = ref(false)
@@ -40,7 +40,7 @@ const recentItems = ref([])
 onMounted(async () => {
   loading.value = true
   try {
-    const { list } = await getItems({ page: 1, pageSize: 6 })
+    const { list } = normalizePage(await getItems({ page: 1, pageSize: 6 }))
     recentItems.value = list
   } finally {
     loading.value = false

@@ -15,7 +15,7 @@ export function approveClaim(id) {
   return http.post(`/claims/${id}/approve`)
 }
 
-// POST /claims/{id}/reject 发布者驳回
-export function rejectClaim(id) {
-  return http.post(`/claims/${id}/reject`)
+// POST /claims/{id}/reject 发布者驳回（携带驳回理由）
+export function rejectClaim(id, reason) {
+  return http.post(`/claims/${id}/reject`, { reason })
 }

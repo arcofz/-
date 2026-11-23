@@ -69,7 +69,11 @@ const item = ref(null)
 const matches = ref([])
 const loading = ref(false)
 
-const canOperate = computed(() => auth.isLoggedIn && item.value && Number(item.value.userId) === Number(auth.user.id))
+const canOperate = computed(
+  () => auth.isLoggedIn && item.value?.type === 'lost' && Number(item.value.userId) === Number(auth.user?.id)
+)
+
+const backToList = () => router.push('/items')
 
 const reasonText = (m) => {
   if (m.reason) return m.reason

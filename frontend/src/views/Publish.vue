@@ -62,7 +62,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
@@ -138,18 +138,46 @@ const onSubmit = () => {
   })
 }
 
-onMounted(async () => {
+const resetForm = () => {
+  form.type = 'lost'
+  form.title = ''
+  form.categoryId = null
+  form.locationId = null
+  form.eventTime = ''
+  form.description = ''
+  form.imageUrl = null
+  imageFileList.value = []
+  formRef.value?.clearValidate()
+}
+
+const loadEdit = async () => {
+  // /publish 与 /items/:id/edit 共用本组件，路由切换时组件被复用，
+  // 用 fullPath 做竞态保护，防止旧请求回填到新页面
+  const path = route.fullPath
+  const item = await getItem(route.params.id)
+  if (path !== route.fullPath) return
+  form.type = item.type
+  form.title = item.title
+  form.categoryId = item.categoryId ?? null
+  form.locationId = item.locationId ?? null
+  form.eventTime = item.eventTime || ''
+  form.description = item.description || ''
+  form.imageUrl = item.imageUrl || null
+}
+
+const init = async () => {
+  resetForm()
   if (isEdit.value) {
-    const item = await getItem(route.params.id)
-    form.type = item.type
-    form.title = item.title
-    form.categoryId = item.categoryId ?? null
-    form.locationId = item.locationId ?? null
-    form.eventTime = item.eventTime || ''
-    form.description = item.description || ''
-    form.imageUrl = item.imageUrl || null
+    try {
+      await loadEdit()
+    } catch (e) {
+      // 404 等错误由空表单兜底，保存时会再次报错
+    }
   }
-})
+}
+
+onMounted(init)
+watch(() => route.fullPath, init)
 </script>
 
 <style scoped>

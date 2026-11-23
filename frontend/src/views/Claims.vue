@@ -127,12 +127,18 @@ const openApprove = (row) => {
 }
 
 const onApprove = async () => {
+  const hasTime = !!approveForm.handTime
+  const hasPlace = !!approveForm.place.trim()
+  if (hasTime !== hasPlace) {
+    ElMessage.warning('交接时间和地点需要同时填写，或都不填写')
+    return
+  }
   acting.value = true
   try {
     await approveClaim(currentRow.value.id)
     // 若同时填了交接信息，通过后直接登记交接
-    if (approveForm.handTime && approveForm.place) {
-      await createHandover({ claimId: currentRow.value.id, handTime: approveForm.handTime, place: approveForm.place })
+    if (hasTime && hasPlace) {
+      await createHandover({ claimId: currentRow.value.id, handTime: approveForm.handTime, place: approveForm.place.trim() })
       ElMessage.success('已通过并登记交接')
     } else {
       ElMessage.success('已通过')
@@ -147,14 +153,17 @@ const onApprove = async () => {
 }
 
 const onReject = (row) => {
-  ElMessageBox.confirm('驳回后申请人会收到通知，确定驳回吗？', '驳回认领', {
+  ElMessageBox.prompt('请填写驳回理由，申请人会收到通知', '驳回认领', {
     confirmButtonText: '驳回',
     cancelButtonText: '取消',
-    type: 'warning'
+    type: 'warning',
+    inputType: 'textarea',
+    inputPlaceholder: '例如：证据不足以证明物品归属',
+    inputValidator: (v) => (v && v.trim() ? true : '请填写驳回理由')
   })
-    .then(async () => {
+    .then(async ({ value }) => {
       try {
-        await rejectClaim(row.id)
+        await rejectClaim(row.id, value.trim())
         ElMessage.success('已驳回')
         fetchClaims()
       } catch (e) {

@@ -17,7 +17,9 @@ http.interceptors.response.use(
   (response) => {
     const body = response.data
     if (body && body.code !== 0) {
-      return Promise.reject(new Error(body.message || '请求失败'))
+      const err = new Error(body.message || '请求失败')
+      err.code = body.code
+      return Promise.reject(err)
     }
     return body.data
   },

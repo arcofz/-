@@ -277,9 +277,12 @@ const routes = {
     const item = byId(db.items, claim.itemId)
     if (item.userId !== user.id && user.role !== 'admin') throw fail(403, '只有发布者可以审核认领')
     if (claim.status !== 'pending') throw fail(409, '该认领已审核过')
+    const reason = (JSON.parse(config.data || '{}').reason || '').trim()
+    if (!reason) throw fail(400, '请填写驳回理由')
     claim.status = 'rejected'
+    claim.reason = reason
     claim.reviewedAt = new Date().toISOString()
-    notify(claim.claimantId, 'review', `你对「${item.title}」的认领已被驳回，可重新提交证据。`)
+    notify(claim.claimantId, 'review', `你对「${item.title}」的认领已被驳回：${reason}`)
     return ok(enrichClaim(claim))
   },
 
@@ -305,7 +308,19 @@ const routes = {
     if (!handover) throw fail(404, '交接记录不存在', 404)
     const claim = byId(db.claims, handover.claimId)
     const item = claim ? byId(db.items, claim.itemId) : null
-    return ok({ ...handover, itemTitle: item ? item.title : '', itemId: item ? item.id : null })
+    const claimant = claim ? byId(db.users, claim.claimantId) : null
+    const owner = item ? byId(db.users, item.userId) : null
+    return ok({
+      ...handover,
+      itemId: item ? item.id : null,
+      itemTitle: item ? item.title : '',
+      itemType: item ? item.type : '',
+      claimantId: claim ? claim.claimantId : null,
+      claimantName: claimant ? claimant.name : '',
+      ownerId: owner ? owner.id : null,
+      ownerName: owner ? owner.name : '',
+      ownerContact: owner ? owner.contact : ''
+    })
   },
 
   'GET /notifications': (config) => {
