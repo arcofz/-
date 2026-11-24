@@ -28,6 +28,11 @@ http.interceptors.response.use(
       localStorage.removeItem('token')
       window.location.href = '/login'
     }
+    // HTTP 4xx/5xx 时同样把业务错误码与后端 message 挂到错误对象上，
+    // 让页面可以统一用 e.code / e.message 处理
+    const body = error.response?.data
+    error.code = body?.code ?? error.response?.status
+    if (body?.message) error.message = body.message
     return Promise.reject(error)
   }
 )

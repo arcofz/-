@@ -74,14 +74,16 @@ const currentUser = (config) => {
 
 const publicUser = (u) => ({ id: u.id, studentNo: u.studentNo, name: u.name, role: u.role, contact: u.contact })
 
-const enrichItem = (item) => {
+const enrichItem = (item, config) => {
   const user = byId(db.users, item.userId)
   const cat = CATEGORIES.find((c) => c.id === Number(item.categoryId))
   const loc = LOCATIONS.find((l) => l.id === Number(item.locationId))
+  // 联系方式仅对已登录用户可见（与详情页展示逻辑一致）
+  const viewerId = config ? tokenUserId(config) : null
   return {
     ...item,
     publisherName: user ? user.name : '',
-    publisherContact: user ? user.contact : '',
+    publisherContact: viewerId && user ? user.contact : '',
     categoryName: cat ? cat.name : '',
     locationName: loc ? (loc.floor ? `${loc.building} ${loc.floor}` : loc.building) : ''
   }
@@ -156,7 +158,7 @@ const routes = {
     list = [...list].sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1))
     const total = list.length
     const start = (Number(page) - 1) * Number(pageSize)
-    return ok({ list: list.slice(start, start + Number(pageSize)).map(enrichItem), total, page: Number(page), pageSize: Number(pageSize) })
+    return ok({ list: list.slice(start, start + Number(pageSize)).map((i) => enrichItem(i, config)), total, page: Number(page), pageSize: Number(pageSize) })
   },
   'POST /items': (config) => {
     const user = currentUser(config)
@@ -173,12 +175,12 @@ const routes = {
       deletedAt: null, createdAt: now, updatedAt: now
     }
     db.items.unshift(item)
-    return ok(enrichItem(item))
+    return ok(enrichItem(item, config))
   },
   'GET /items/:id': (config, id) => {
     const item = byId(db.items, id)
     if (!item || item.deletedAt) throw fail(404, '物品不存在', 404)
-    return ok(enrichItem(item))
+    return ok(enrichItem(item, config))
   },
   'PUT /items/:id': (config, id) => {
     const user = currentUser(config)
@@ -194,7 +196,7 @@ const routes = {
     if (body.eventTime) item.eventTime = body.eventTime
     if (body.imageUrl != null) item.imageUrl = body.imageUrl
     item.updatedAt = new Date().toISOString()
-    return ok(enrichItem(item))
+    return ok(enrichItem(item, config))
   },
   'DELETE /items/:id': (config, id) => {
     const user = currentUser(config)

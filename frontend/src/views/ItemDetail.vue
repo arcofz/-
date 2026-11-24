@@ -66,12 +66,12 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Picture } from '@element-plus/icons-vue'
 import { getItem, deleteItem } from '../api/items'
-import { createClaim } from '../api/claims'
+import { createClaim, getMyClaims } from '../api/claims'
 import { useAuthStore } from '../stores/auth'
 import { categoryName, locationName } from '../constants/options'
 import { formatTime } from '../utils/format'
@@ -93,8 +93,20 @@ const isOwner = computed(() => auth.user && item.value && Number(item.value.user
 const fetchDetail = async () => {
   loading.value = true
   item.value = null
+  claimed.value = false
   try {
     item.value = await getItem(route.params.id)
+    // 进页面时按 itemId 查询本人认领记录，避免离开页面后 claimed 状态丢失
+    if (auth.isLoggedIn && item.value.type === 'found') {
+      try {
+        const claims = await getMyClaims()
+        claimed.value = claims.some(
+          (c) => Number(c.itemId) === Number(item.value.id) && Number(c.claimantId) === Number(auth.user?.id)
+        )
+      } catch (e) {
+        // 查询失败不影响详情展示，提交时仍会由 409 兜底
+      }
+    }
   } catch (e) {
     // 404 等错误由空状态兜底
   } finally {
@@ -142,6 +154,7 @@ const onClaim = async () => {
 }
 
 onMounted(fetchDetail)
+watch(() => route.params.id, fetchDetail)
 </script>
 
 <style scoped>
