@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xunwu.leida.mapper.MatchMapper">
+
+    <!-- 唯一键 lost_item_id + found_item_id;已存在则刷新分数、状态回到 pending -->
+    <select id="upsert" resultType="com.xunwu.leida.entity.Match">
+        INSERT INTO matches (lost_item_id, found_item_id, score)
+        VALUES (#{lostItemId}, #{foundItemId}, #{score})
+        ON CONFLICT (lost_item_id, found_item_id)
+        DO UPDATE SET score = EXCLUDED.score, status = 'pending'
+        RETURNING id, lost_item_id, found_item_id, score, status, created_at
+    </select>
+
+    <select id="findById" resultType="com.xunwu.leida.entity.Match">
+        SELECT id, lost_item_id, found_item_id, score, status, created_at
+        FROM matches
+        WHERE id = #{id}
+    </select>
+
+    <update id="updateStatus">
+        UPDATE matches
+        SET status = #{status}
+        WHERE id = #{id} AND status = 'pending'
+    </update>
+
+</mapper>

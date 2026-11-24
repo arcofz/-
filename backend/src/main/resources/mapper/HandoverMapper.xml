@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xunwu.leida.mapper.HandoverMapper">
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO handovers (claim_id, hand_time, place)
+        VALUES (#{claimId}, #{handTime}, #{place})
+    </insert>
+
+    <select id="findByClaimId" resultType="com.xunwu.leida.entity.Handover">
+        SELECT id, claim_id, hand_time, place, created_at
+        FROM handovers
+        WHERE claim_id = #{claimId}
+    </select>
+
+    <select id="findVOById" resultType="com.xunwu.leida.dto.HandoverVO">
+        SELECT h.id, h.claim_id, c.item_id, i.title AS item_title, i.type AS item_type,
+               i.user_id AS owner_id, ou.name AS owner_name, ou.contact AS owner_contact,
+               c.claimant_id, cu.name AS claimant_name, cu.contact AS claimant_contact,
+               h.hand_time, h.place, h.created_at
+        FROM handovers h
+        JOIN claims c ON c.id = h.claim_id
+        JOIN items i ON i.id = c.item_id
+        JOIN users ou ON ou.id = i.user_id
+        JOIN users cu ON cu.id = c.claimant_id
+        WHERE h.id = #{id}
+    </select>
+
+</mapper>

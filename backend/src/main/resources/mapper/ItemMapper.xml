@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xunwu.leida.mapper.ItemMapper">
+
+    <!-- 联表带出分类、地点、发布者;地点名 = building + floor(floor 可空) -->
+    <sql id="itemColumns">
+        SELECT i.id, i.title, i.description, i.type, i.status,
+               i.category_id, c.name AS category_name,
+               i.location_id,
+               CONCAT(l.building, COALESCE(' ' || l.floor, '')) AS location_name,
+               l.building,
+               i.event_time, i.image_url,
+               i.user_id AS publisher_id, u.name AS publisher_name, u.contact AS publisher_contact,
+               i.created_at
+        FROM items i
+        LEFT JOIN categories c ON c.id = i.category_id
+        LEFT JOIN locations l ON l.id = i.location_id
+        JOIN users u ON u.id = i.user_id
+    </sql>
+
+    <sql id="listFilter">
+        WHERE i.deleted_at IS NULL
+        <if test="type != null and type != ''">
+            AND i.type = #{type}
+        </if>
+        <if test="categoryId != null">
+            AND i.category_id = #{categoryId}
+        </if>
+        <if test="locationId != null">
+            AND i.location_id = #{locationId}
+        </if>
+    </sql>
+
+    <select id="findPage" resultType="com.xunwu.leida.entity.Item">
+        <include refid="itemColumns"/>
+        <include refid="listFilter"/>
+        ORDER BY i.created_at DESC, i.id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="count" resultType="long">
+        SELECT COUNT(*)
+        FROM items i
+        <include refid="listFilter"/>
+    </select>
+
+    <select id="findById" resultType="com.xunwu.leida.entity.Item">
+        <include refid="itemColumns"/>
+        WHERE i.id = #{id} AND i.deleted_at IS NULL
+    </select>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO items (user_id, title, description, type, status,
+                           category_id, location_id, event_time, image_url)
+        VALUES (#{publisherId}, #{title}, #{description}, #{type}, 'pending',
+                #{categoryId}, #{locationId}, #{eventTime}, #{imageUrl})
+    </insert>
+
+    <update id="update">
+        UPDATE items
+        SET title = #{title},
+            description = #{description},
+            category_id = #{categoryId},
+            location_id = #{locationId},
+            event_time = #{eventTime},
+            image_url = #{imageUrl},
+            updated_at = now()
+        WHERE id = #{id} AND deleted_at IS NULL
+    </update>
+
+    <update id="softDelete">
+        UPDATE items
+        SET deleted_at = now(), updated_at = now()
+        WHERE id = #{id} AND deleted_at IS NULL
+    </update>
+
+    <select id="findMyClaim" resultType="com.xunwu.leida.dto.MyClaimVO">
+        SELECT id, status, created_at
+        FROM claims
+        WHERE item_id = #{itemId} AND claimant_id = #{userId}
+    </select>
+
+    <select id="findMatchCandidates" resultType="com.xunwu.leida.entity.Item">
+        <include refid="itemColumns"/>
+        WHERE i.deleted_at IS NULL
+          AND i.id != #{id}
+          AND i.type = #{type}
+          AND i.status NOT IN ('cancelled', 'completed')
+    </select>
+
+    <update id="updateStatus">
+        UPDATE items
+        SET status = #{status}, updated_at = now()
+        WHERE id = #{id} AND deleted_at IS NULL
+    </update>
+
+    <select id="hasApprovedClaim" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1 FROM claims
+            WHERE item_id = #{itemId} AND claimant_id = #{userId} AND status = 'approved'
+        )
+    </select>
+
+</mapper>

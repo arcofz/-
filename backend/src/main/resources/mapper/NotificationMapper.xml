@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xunwu.leida.mapper.NotificationMapper">
+
+    <sql id="userFilter">
+        WHERE user_id = #{userId}
+        <if test="unreadOnly">
+            AND is_read = FALSE
+        </if>
+    </sql>
+
+    <select id="findByUser" resultType="com.xunwu.leida.entity.Notification">
+        SELECT id, user_id, type, content, is_read, created_at
+        FROM notifications
+        <include refid="userFilter"/>
+        ORDER BY created_at DESC, id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countByUser" resultType="long">
+        SELECT COUNT(*)
+        FROM notifications
+        <include refid="userFilter"/>
+    </select>
+
+    <select id="findById" resultType="com.xunwu.leida.entity.Notification">
+        SELECT id, user_id, type, content, is_read, created_at
+        FROM notifications
+        WHERE id = #{id}
+    </select>
+
+    <update id="markRead">
+        UPDATE notifications
+        SET is_read = TRUE
+        WHERE id = #{id}
+    </update>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO notifications (user_id, type, content)
+        VALUES (#{userId}, #{type}, #{content})
+    </insert>
+
+</mapper>

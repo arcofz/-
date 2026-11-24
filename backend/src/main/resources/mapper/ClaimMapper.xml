@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xunwu.leida.mapper.ClaimMapper">
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO claims (item_id, claimant_id, evidence)
+        VALUES (#{itemId}, #{claimantId}, #{evidence})
+    </insert>
+
+    <select id="findById" resultType="com.xunwu.leida.entity.Claim">
+        SELECT id, item_id, claimant_id, evidence, status, reason, created_at, reviewed_at
+        FROM claims
+        WHERE id = #{id}
+    </select>
+
+    <!-- 契约第 2 节字段;owner = 物品发布者 -->
+    <sql id="claimVOColumns">
+        SELECT c.id, c.item_id, i.title AS item_title, i.type AS item_type,
+               c.claimant_id, cu.name AS claimant_name,
+               i.user_id AS owner_id, ou.name AS owner_name,
+               c.evidence, c.status, c.reason, c.created_at, c.reviewed_at,
+               h.id AS handover_id
+        FROM claims c
+        JOIN items i ON i.id = c.item_id
+        JOIN users cu ON cu.id = c.claimant_id
+        JOIN users ou ON ou.id = i.user_id
+        LEFT JOIN handovers h ON h.claim_id = c.id
+    </sql>
+
+    <select id="findVOById" resultType="com.xunwu.leida.dto.ClaimVO">
+        <include refid="claimVOColumns"/>
+        WHERE c.id = #{id}
+    </select>
+
+    <sql id="mineFilter">
+        WHERE
+        <choose>
+            <when test="role == 'claimant'">
+                c.claimant_id = #{userId}
+            </when>
+            <when test="role == 'owner'">
+                i.user_id = #{userId}
+            </when>
+            <otherwise>
+                (c.claimant_id = #{userId} OR i.user_id = #{userId})
+            </otherwise>
+        </choose>
+        <if test="status != null and status != ''">
+            AND c.status = #{status}
+        </if>
+    </sql>
+
+    <select id="findMine" resultType="com.xunwu.leida.dto.ClaimVO">
+        <include refid="claimVOColumns"/>
+        <include refid="mineFilter"/>
+        ORDER BY c.created_at DESC, c.id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countMine" resultType="long">
+        SELECT COUNT(*)
+        FROM claims c
+        JOIN items i ON i.id = c.item_id
+        <include refid="mineFilter"/>
+    </select>
+
+    <!-- WHERE 带 pending,并发重复审核时影响行数为 0 -->
+    <update id="review">
+        UPDATE claims
+        SET status = #{status}, reason = #{reason}, reviewed_at = now()
+        WHERE id = #{id} AND status = 'pending'
+    </update>
+
+</mapper>
