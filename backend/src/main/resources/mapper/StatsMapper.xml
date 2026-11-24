@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xunwu.leida.mapper.StatsMapper">
+
+    <!-- 物品计数只统计未软删的 -->
+    <select id="stats" resultType="com.xunwu.leida.dto.StatsVO">
+        SELECT
+            (SELECT COUNT(*) FROM users) AS user_count,
+            (SELECT COUNT(*) FROM items WHERE deleted_at IS NULL) AS item_count,
+            (SELECT COUNT(*) FROM items WHERE deleted_at IS NULL AND type = 'lost') AS lost_count,
+            (SELECT COUNT(*) FROM items WHERE deleted_at IS NULL AND type = 'found') AS found_count,
+            (SELECT COUNT(*) FROM items WHERE deleted_at IS NULL AND status = 'pending') AS pending_item_count,
+            (SELECT COUNT(*) FROM items WHERE deleted_at IS NULL AND status = 'completed') AS completed_item_count,
+            (SELECT COUNT(*) FROM matches) AS match_count,
+            (SELECT COUNT(*) FROM claims) AS claim_count,
+            (SELECT COUNT(*) FROM claims WHERE status = 'pending') AS pending_claim_count
+    </select>
+
+</mapper>

@@ -8,6 +8,10 @@ spring:
     password: ${DB_PASSWORD:postgres}
   jackson:
     default-property-inclusion: non_null
+  servlet:
+    multipart:
+      max-file-size: 2MB
+      max-request-size: 4MB
 
 mybatis:
   configuration:
@@ -18,3 +22,7 @@ app:
   jwt:
     secret: ${JWT_SECRET:change-me-in-local-env}
     expiration-minutes: 120
+  upload:
+    # 相对 backend 工作目录;public-base-url 为空时返回 /uploads/xxx
+    dir: ${UPLOAD_DIR:uploads}
+    public-base-url: ${UPLOAD_PUBLIC_BASE_URL:}

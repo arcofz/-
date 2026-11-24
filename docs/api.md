@@ -199,3 +199,28 @@
 - 改接口先改本文档，再改代码。
 - 每个接口至少自测：正常、参数错误、未登录、无权限。
 - 表结构或接口字段变化，同步更新本文档和答辩 PPT 第 6、7 页。
+
+## 实现说明
+
+> 2026-11-24 C 端实现补充，不改动上文已确认的契约条款。
+
+### 数据库新列与迁移
+
+- `items.image_url VARCHAR(512)`：发布/编辑时随 `imageUrl` 提交，列表与详情原样返回。
+- `claims.reason TEXT`：驳回理由，`approve` 时为 `null`。
+- 两列已同步进 `database/schema.sql`；存量库执行迁移脚本 `database/migrations/20261124_add_item_image_and_claim_reason.sql`（`ADD COLUMN IF NOT EXISTS`，可重复执行）。
+
+### 匹配分数与 reasons
+
+- 权重：分类一致 +40；同一地点 +25（不同地点但同一栋楼 +15）；时间差 ≤24h +20、≤72h +15、≤7 天 +10、≤30 天 +5；文本相似度 ×15。总分封顶 100，四舍五入保留 2 位小数。
+- 文本相似度：`title + description` 合并后，中文按二元组、英文/数字按单词切分，取 Dice 系数（`2×|交集| / (|A|+|B|)`）。
+- `GET /items/{id}/matches` 返回 Top 5，`reasons` 为中文短句数组，格式示例：`"分类一致 +40"`、`"同一地点 +25"`、`"同一栋楼 +15"`、`"时间相差 3 小时 +20"`（不足 1 小时按分钟、不足 24 小时按小时、其余按天）、`"文本相似度 0.62 +9.30"`。
+- 结果 upsert 进 `matches`（唯一键 `lost_item_id + found_item_id`），已存在则刷新分数并把状态重置为 `pending`。
+- 候选排除自身、已软删、`cancelled` / `completed` 的物品，只取相反 `type`。
+
+### 图片本地存储与 URL 规则
+
+- 存储目录：`app.upload.dir`（默认 `uploads`，相对 backend 工作目录），可用环境变量 `UPLOAD_DIR` 覆盖。
+- 文件名：`UUID.扩展名`（白名单 jpg/jpeg/png/gif/webp），不使用原始文件名。
+- 访问路径：`/uploads/{filename}`，由后端静态资源映射直接对外提供。
+- 返回 URL：`{UPLOAD_PUBLIC_BASE_URL}/uploads/{filename}`；`UPLOAD_PUBLIC_BASE_URL` 为空时返回相对路径 `/uploads/{filename}`。

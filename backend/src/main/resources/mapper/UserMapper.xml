@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xunwu.leida.mapper.UserMapper">
+
+    <select id="findByStudentNo" resultType="com.xunwu.leida.entity.User">
+        SELECT id, student_no, name, role, contact, password_hash, created_at
+        FROM users
+        WHERE student_no = #{studentNo}
+    </select>
+
+    <select id="findById" resultType="com.xunwu.leida.entity.User">
+        SELECT id, student_no, name, role, contact, password_hash, created_at
+        FROM users
+        WHERE id = #{id}
+    </select>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO users (student_no, name, role, contact, password_hash)
+        VALUES (#{studentNo}, #{name}, #{role}, #{contact}, #{passwordHash})
+    </insert>
+
+    <sql id="keywordFilter">
+        <if test="keyword != null and keyword != ''">
+            WHERE student_no ILIKE '%' || #{keyword} || '%'
+               OR name ILIKE '%' || #{keyword} || '%'
+        </if>
+    </sql>
+
+    <select id="findPage" resultType="com.xunwu.leida.entity.User">
+        SELECT id, student_no, name, role, contact, created_at
+        FROM users
+        <include refid="keywordFilter"/>
+        ORDER BY id
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="count" resultType="long">
+        SELECT COUNT(*)
+        FROM users
+        <include refid="keywordFilter"/>
+    </select>
+
+</mapper>

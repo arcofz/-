@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS items (
     category_id BIGINT REFERENCES categories(id) ON DELETE SET NULL,
     location_id BIGINT REFERENCES locations(id) ON DELETE SET NULL,
     event_time  TIMESTAMPTZ NOT NULL,
+    image_url   VARCHAR(512),
     deleted_at  TIMESTAMPTZ,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -63,6 +64,7 @@ CREATE TABLE IF NOT EXISTS claims (
     evidence    TEXT NOT NULL,
     status      VARCHAR(16) NOT NULL DEFAULT 'pending'
                 CHECK (status IN ('pending', 'approved', 'rejected')),
+    reason      TEXT,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
     reviewed_at TIMESTAMPTZ,
     CONSTRAINT uq_claim UNIQUE (item_id, claimant_id)

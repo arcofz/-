@@ -27,3 +27,6 @@ Thumbs.db
 
 # 日志
 *.log
+
+# 本地上传文件
+uploads/
