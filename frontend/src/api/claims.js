@@ -1,4 +1,5 @@
 import http from './http'
+import { normalizePage } from './items'
 
 // POST /claims 提交认领与证据
 export function createClaim(data) {
@@ -6,8 +7,10 @@ export function createClaim(data) {
 }
 
 // GET /claims/mine 我的认领（我发起的 + 我发布物品收到的）
-export function getMyClaims() {
-  return http.get('/claims/mine')
+// 后端返回 { list, total }，页面统一按数组使用
+export async function getMyClaims() {
+  const data = await http.get('/claims/mine')
+  return normalizePage(data).list
 }
 
 // POST /claims/{id}/approve 发布者通过

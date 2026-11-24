@@ -1,8 +1,11 @@
 import http from './http'
+import { normalizePage } from './items'
 
 // GET /notifications 通知列表
-export function getNotifications() {
-  return http.get('/notifications')
+// 后端返回 { list, total }，页面统一按数组使用
+export async function getNotifications() {
+  const data = await http.get('/notifications')
+  return normalizePage(data).list
 }
 
 // POST /notifications/{id}/read 标记已读
