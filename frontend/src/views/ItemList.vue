@@ -56,8 +56,8 @@ const fetchList = async () => {
   try {
     const data = await getItems({
       type: filters.type || undefined,
-      category: filters.category ?? undefined,
-      location: filters.location ?? undefined,
+      categoryId: filters.category ?? undefined,
+      locationId: filters.location ?? undefined,
       page: page.value,
       pageSize
     })
