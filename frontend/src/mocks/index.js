@@ -194,7 +194,14 @@ const routes = {
   'GET /items/:id': (config, id) => {
     const item = byId(db.items, id)
     if (!item || item.deletedAt) throw fail(404, '物品不存在', 404)
-    return ok(enrichItem(item, config))
+    // api.md §7：登录用户返回其对该物品的认领状态，匿名或无认领为 null
+    const viewerId = tokenUserId(config)
+    let myClaim = null
+    if (viewerId) {
+      const claim = db.claims.find((c) => c.itemId === item.id && c.claimantId === viewerId)
+      if (claim) myClaim = { id: claim.id, status: claim.status, createdAt: claim.createdAt }
+    }
+    return ok({ ...enrichItem(item, config), myClaim })
   },
   'PUT /items/:id': (config, id) => {
     const user = currentUser(config)
@@ -380,6 +387,19 @@ const routes = {
     const user = currentUser(config)
     if (user.role !== 'admin') throw fail(403, '无权限访问')
     return ok(db.users.map(publicUser))
+  },
+  // api.md §1：公开的分类/地点接口，返回 { list: [...] }
+  'GET /categories': () => ok({ list: CATEGORIES }),
+  'GET /locations': () => ok({ list: LOCATIONS }),
+  // api.md §9：图片上传，登录后可用，multipart/form-data，字段名 file，≤2MB
+  'POST /uploads/images': (config) => {
+    currentUser(config)
+    const data = config.data
+    const file = typeof data?.get === 'function' ? data.get('file') : null
+    if (!file) throw fail(400, '请选择图片文件')
+    if (!(file.type || '').startsWith('image/')) throw fail(400, '只支持图片文件')
+    if (file.size > 2 * 1024 * 1024) throw fail(400, '图片大小不能超过 2MB')
+    return ok({ url: `https://picsum.photos/seed/upload${Date.now()}/400/300` })
   },
   'GET /admin/categories': (config) => {
     const user = currentUser(config)

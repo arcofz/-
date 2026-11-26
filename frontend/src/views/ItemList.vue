@@ -13,10 +13,10 @@
           <el-radio-button value="found">拾物</el-radio-button>
         </el-radio-group>
         <el-select v-model="filters.category" placeholder="分类" clearable style="width: 140px" @change="onFilterChange">
-          <el-option v-for="c in CATEGORIES" :key="c.id" :label="c.name" :value="c.id" />
+          <el-option v-for="c in categories" :key="c.id" :label="c.name" :value="c.id" />
         </el-select>
         <el-select v-model="filters.location" placeholder="地点" clearable style="width: 160px" @change="onFilterChange">
-          <el-option v-for="l in LOCATIONS" :key="l.id" :label="l.floor ? `${l.building} ${l.floor}` : l.building" :value="l.id" />
+          <el-option v-for="l in locations" :key="l.id" :label="l.floor ? `${l.building} ${l.floor}` : l.building" :value="l.id" />
         </el-select>
       </div>
     </el-card>
@@ -41,6 +41,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { getItems, normalizePage } from '../api/items'
+import { getCategories, getLocations } from '../api/options'
 import { CATEGORIES, LOCATIONS } from '../constants/options'
 import ItemCard from '../components/ItemCard.vue'
 
@@ -50,6 +51,9 @@ const total = ref(0)
 const page = ref(1)
 const pageSize = 12
 const filters = reactive({ type: '', category: null, location: null })
+// 下拉选项优先走公开接口（api.md §1），接口失败时回退种子常量
+const categories = ref(CATEGORIES)
+const locations = ref(LOCATIONS)
 
 const fetchList = async () => {
   loading.value = true
@@ -74,7 +78,20 @@ const onFilterChange = () => {
   fetchList()
 }
 
-onMounted(fetchList)
+const loadOptions = async () => {
+  try {
+    const [cats, locs] = await Promise.all([getCategories(), getLocations()])
+    categories.value = cats
+    locations.value = locs
+  } catch (e) {
+    // 接口失败保留常量兜底
+  }
+}
+
+onMounted(() => {
+  fetchList()
+  loadOptions()
+})
 </script>
 
 <style scoped>

@@ -17,12 +17,12 @@
         </el-form-item>
         <el-form-item label="分类" prop="categoryId">
           <el-select v-model="form.categoryId" placeholder="选择分类" style="width: 100%">
-            <el-option v-for="c in CATEGORIES" :key="c.id" :label="c.name" :value="c.id" />
+            <el-option v-for="c in categories" :key="c.id" :label="c.name" :value="c.id" />
           </el-select>
         </el-form-item>
         <el-form-item label="地点" prop="locationId">
           <el-select v-model="form.locationId" placeholder="选择地点" style="width: 100%">
-            <el-option v-for="l in LOCATIONS" :key="l.id" :label="l.floor ? `${l.building} ${l.floor}` : l.building" :value="l.id" />
+            <el-option v-for="l in locations" :key="l.id" :label="l.floor ? `${l.building} ${l.floor}` : l.building" :value="l.id" />
           </el-select>
         </el-form-item>
         <el-form-item label="发生时间" prop="eventTime">
@@ -38,8 +38,7 @@
           <el-input v-model="form.description" type="textarea" :rows="4" maxlength="1000" show-word-limit placeholder="物品特征、丢失经过等" />
         </el-form-item>
         <el-form-item label="图片">
-          <!-- docs/api.md 暂无上传接口，这里仅本地预览；后端提供上传接口后，
-               上传拿到 URL 再随表单提交 imageUrl 字段 -->
+          <!-- 选图后随表单提交时上传（api.md §9），拿到 URL 存 imageUrl；编辑时回填已有图 -->
           <el-upload
             :auto-upload="false"
             :limit="1"
@@ -67,6 +66,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import { createItem, updateItem, getItem } from '../api/items'
+import { uploadImage } from '../api/uploads'
+import { getCategories, getLocations } from '../api/options'
 import { CATEGORIES, LOCATIONS } from '../constants/options'
 
 const route = useRoute()
@@ -77,6 +78,9 @@ const isEdit = computed(() => !!route.params.id)
 const formRef = ref(null)
 const submitting = ref(false)
 const imageFileList = ref([])
+// 下拉选项优先走公开接口（api.md §1），接口失败时回退种子常量
+const categories = ref(CATEGORIES)
+const locations = ref(LOCATIONS)
 
 const form = reactive({
   type: 'lost',
@@ -105,6 +109,7 @@ const onImageChange = (file) => {
 
 const onImageRemove = () => {
   imageFileList.value = []
+  form.imageUrl = null
 }
 
 const onSubmit = () => {
@@ -112,6 +117,23 @@ const onSubmit = () => {
     if (!valid) return
     submitting.value = true
     try {
+      // 有新选的本地文件时先上传拿 URL；编辑回填的已有图（无 raw）保留原 URL
+      const fileEntry = imageFileList.value[0]
+      let imageUrl = fileEntry && !fileEntry.raw ? form.imageUrl : null
+      if (fileEntry?.raw) {
+        if (!fileEntry.raw.type.startsWith('image/')) {
+          ElMessage.error('只支持图片文件')
+          submitting.value = false
+          return
+        }
+        if (fileEntry.raw.size > 2 * 1024 * 1024) {
+          ElMessage.error('图片大小不能超过 2MB')
+          submitting.value = false
+          return
+        }
+        const data = await uploadImage(fileEntry.raw)
+        imageUrl = data.url
+      }
       const payload = {
         type: form.type,
         title: form.title.trim(),
@@ -119,7 +141,7 @@ const onSubmit = () => {
         locationId: form.locationId,
         eventTime: form.eventTime,
         description: (form.description || '').trim(),
-        ...(form.imageUrl ? { imageUrl: form.imageUrl } : {})
+        imageUrl
       }
       if (isEdit.value) {
         await updateItem(route.params.id, payload)
@@ -163,6 +185,7 @@ const loadEdit = async () => {
   form.eventTime = item.eventTime || ''
   form.description = item.description || ''
   form.imageUrl = item.imageUrl || null
+  imageFileList.value = item.imageUrl ? [{ name: '当前图片', url: item.imageUrl }] : []
 }
 
 const init = async () => {
@@ -176,7 +199,20 @@ const init = async () => {
   }
 }
 
-onMounted(init)
+const loadOptions = async () => {
+  try {
+    const [cats, locs] = await Promise.all([getCategories(), getLocations()])
+    categories.value = cats
+    locations.value = locs
+  } catch (e) {
+    // 接口失败保留常量兜底
+  }
+}
+
+onMounted(() => {
+  init()
+  loadOptions()
+})
 watch(() => route.fullPath, init)
 </script>
 
