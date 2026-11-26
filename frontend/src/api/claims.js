@@ -13,9 +13,9 @@ export async function getMyClaims() {
   return normalizePage(data).list
 }
 
-// POST /claims/{id}/approve 发布者通过
-export function approveClaim(id) {
-  return http.post(`/claims/${id}/approve`)
+// POST /claims/{id}/approve 发布者通过；handTime/place 同时传时单事务完成交接（api.md §3）
+export function approveClaim(id, data) {
+  return http.post(`/claims/${id}/approve`, data)
 }
 
 // POST /claims/{id}/reject 发布者驳回（携带驳回理由）

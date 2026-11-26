@@ -1,6 +1,6 @@
 // 与 database/seed.sql 中的种子数据一一对应。
-// docs/api.md 目前没有公开的分类/地点接口（只有 /admin/* 管理接口），
-// 发布页等下拉选项暂时使用这里的固定值；后端补充公共接口后可改为接口获取。
+// 下拉选项已改为调公开接口 /categories、/locations（见 api/options.js），
+// 这里的固定值仅作接口失败时的兜底，以及 categoryName/locationName 的 ID 映射。
 export const CATEGORIES = [
   { id: 1, name: '证件' },
   { id: 2, name: '电子产品' },

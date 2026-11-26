@@ -135,14 +135,12 @@ const onApprove = async () => {
   }
   acting.value = true
   try {
-    await approveClaim(currentRow.value.id)
-    // 若同时填了交接信息，通过后直接登记交接
-    if (hasTime && hasPlace) {
-      await createHandover({ claimId: currentRow.value.id, handTime: approveForm.handTime, place: approveForm.place.trim() })
-      ElMessage.success('已通过并登记交接')
-    } else {
-      ElMessage.success('已通过')
-    }
+    // api.md §3：handTime/place 随 approve 一次提交，后端单事务完成通过+交接，不再单独调 handovers
+    await approveClaim(currentRow.value.id, {
+      handTime: hasTime ? approveForm.handTime : undefined,
+      place: hasPlace ? approveForm.place.trim() : undefined
+    })
+    ElMessage.success(hasTime && hasPlace ? '已通过并登记交接' : '已通过')
     approveVisible.value = false
     fetchClaims()
   } catch (e) {

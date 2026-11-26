@@ -74,16 +74,30 @@ const currentUser = (config) => {
 
 const publicUser = (u) => ({ id: u.id, studentNo: u.studentNo, name: u.name, role: u.role, contact: u.contact })
 
+const maskContact = (contact) => {
+  if (!contact) return ''
+  if (contact.length <= 7) return contact.slice(0, 1) + '****'
+  return contact.slice(0, 3) + '****' + contact.slice(-4)
+}
+
 const enrichItem = (item, config) => {
   const user = byId(db.users, item.userId)
   const cat = CATEGORIES.find((c) => c.id === Number(item.categoryId))
   const loc = LOCATIONS.find((l) => l.id === Number(item.locationId))
-  // 联系方式仅对已登录用户可见（与详情页展示逻辑一致）
+  // api.md §4：匿名 null；发布者/管理员/认领已通过申请人完整；其他登录用户脱敏
   const viewerId = config ? tokenUserId(config) : null
+  const viewer = viewerId ? byId(db.users, viewerId) : null
+  let contact = null
+  if (viewer && user) {
+    const approvedClaim = db.claims.some(
+      (c) => c.itemId === item.id && c.claimantId === viewer.id && c.status === 'approved'
+    )
+    contact = viewer.id === user.id || viewer.role === 'admin' || approvedClaim ? user.contact : maskContact(user.contact)
+  }
   return {
     ...item,
     publisherName: user ? user.name : '',
-    publisherContact: viewerId && user ? user.contact : '',
+    publisherContact: contact,
     categoryName: cat ? cat.name : '',
     locationName: loc ? (loc.floor ? `${loc.building} ${loc.floor}` : loc.building) : ''
   }
@@ -150,11 +164,11 @@ const routes = {
   'GET /auth/me': (config) => ok(publicUser(currentUser(config))),
 
   'GET /items': (config) => {
-    const { type, category, location, page = 1, pageSize = 12 } = config.params || {}
+    const { type, categoryId, locationId, page = 1, pageSize = 12 } = config.params || {}
     let list = db.items.filter((i) => !i.deletedAt)
     if (type) list = list.filter((i) => i.type === type)
-    if (category) list = list.filter((i) => i.categoryId === Number(category))
-    if (location) list = list.filter((i) => i.locationId === Number(location))
+    if (categoryId) list = list.filter((i) => i.categoryId === Number(categoryId))
+    if (locationId) list = list.filter((i) => i.locationId === Number(locationId))
     list = [...list].sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1))
     const total = list.length
     const start = (Number(page) - 1) * Number(pageSize)
@@ -180,7 +194,14 @@ const routes = {
   'GET /items/:id': (config, id) => {
     const item = byId(db.items, id)
     if (!item || item.deletedAt) throw fail(404, '物品不存在', 404)
-    return ok(enrichItem(item, config))
+    // api.md §7：登录用户返回其对该物品的认领状态，匿名或无认领为 null
+    const viewerId = tokenUserId(config)
+    let myClaim = null
+    if (viewerId) {
+      const claim = db.claims.find((c) => c.itemId === item.id && c.claimantId === viewerId)
+      if (claim) myClaim = { id: claim.id, status: claim.status, createdAt: claim.createdAt }
+    }
+    return ok({ ...enrichItem(item, config), myClaim })
   },
   'PUT /items/:id': (config, id) => {
     const user = currentUser(config)
@@ -267,10 +288,26 @@ const routes = {
     const item = byId(db.items, claim.itemId)
     if (item.userId !== user.id && user.role !== 'admin') throw fail(403, '只有发布者可以审核认领')
     if (claim.status !== 'pending') throw fail(409, '该认领已审核过')
+    // api.md §3：handTime/place 同时传则单事务完成通过+交接+归档，都不传只通过，只传一个 400
+    const body = JSON.parse(config.data || '{}')
+    const hasTime = !!body.handTime
+    const hasPlace = !!body.place
+    if (hasTime !== hasPlace) throw fail(400, '交接时间和地点需要同时填写，或都不填写')
     claim.status = 'approved'
     claim.reviewedAt = new Date().toISOString()
-    notify(claim.claimantId, 'review', `你对「${item.title}」的认领已通过，请及时与发布者联系完成交接。`)
-    return ok(enrichClaim(claim))
+    let handover = null
+    if (hasTime && hasPlace) {
+      handover = { id: nextId(), claimId: claim.id, handTime: body.handTime, place: body.place, createdAt: new Date().toISOString() }
+      db.handovers.push(handover)
+      claim.handoverId = handover.id
+      item.status = 'completed'
+      notify(claim.claimantId, 'review', `你对「${item.title}」的认领已通过，交接时间：${body.handTime}，地点：${body.place}。`)
+      notify(claim.claimantId, 'handover', `「${item.title}」交接完成，请确认物品无误。`)
+    } else {
+      item.status = 'claimed'
+      notify(claim.claimantId, 'review', `你对「${item.title}」的认领已通过，请及时与发布者联系完成交接。`)
+    }
+    return ok({ claim: enrichClaim(claim), handover })
   },
   'POST /claims/:id/reject': (config, id) => {
     const user = currentUser(config)
@@ -297,6 +334,7 @@ const routes = {
     const item = byId(db.items, claim.itemId)
     if (item.userId !== user.id && user.role !== 'admin') throw fail(403, '只有发布者可以登记交接')
     if (claim.status !== 'approved') throw fail(409, '只有审核通过的认领才能登记交接')
+    if (claim.handoverId) throw fail(409, '该认领已登记过交接')
     if (!handTime || !place) throw fail(400, '交接时间和地点不能为空')
     const handover = { id: nextId(), claimId: Number(claimId), handTime, place, createdAt: new Date().toISOString() }
     db.handovers.push(handover)
@@ -306,12 +344,16 @@ const routes = {
     return ok(handover)
   },
   'GET /handovers/:id': (config, id) => {
+    const user = currentUser(config)
     const handover = byId(db.handovers, id)
     if (!handover) throw fail(404, '交接记录不存在', 404)
     const claim = byId(db.claims, handover.claimId)
     const item = claim ? byId(db.items, claim.itemId) : null
     const claimant = claim ? byId(db.users, claim.claimantId) : null
     const owner = item ? byId(db.users, item.userId) : null
+    // api.md §6：仅认领人、物品发布者、管理员可查看
+    const involved = claim && (user.id === claim.claimantId || (item && user.id === item.userId))
+    if (!involved && user.role !== 'admin') throw fail(403, '只有交接双方或管理员可以查看')
     return ok({
       ...handover,
       itemId: item ? item.id : null,
@@ -319,6 +361,7 @@ const routes = {
       itemType: item ? item.type : '',
       claimantId: claim ? claim.claimantId : null,
       claimantName: claimant ? claimant.name : '',
+      claimantContact: claimant ? claimant.contact : '',
       ownerId: owner ? owner.id : null,
       ownerName: owner ? owner.name : '',
       ownerContact: owner ? owner.contact : ''
@@ -344,6 +387,19 @@ const routes = {
     const user = currentUser(config)
     if (user.role !== 'admin') throw fail(403, '无权限访问')
     return ok(db.users.map(publicUser))
+  },
+  // api.md §1：公开的分类/地点接口，返回 { list: [...] }
+  'GET /categories': () => ok({ list: CATEGORIES }),
+  'GET /locations': () => ok({ list: LOCATIONS }),
+  // api.md §9：图片上传，登录后可用，multipart/form-data，字段名 file，≤2MB
+  'POST /uploads/images': (config) => {
+    currentUser(config)
+    const data = config.data
+    const file = typeof data?.get === 'function' ? data.get('file') : null
+    if (!file) throw fail(400, '请选择图片文件')
+    if (!(file.type || '').startsWith('image/')) throw fail(400, '只支持图片文件')
+    if (file.size > 2 * 1024 * 1024) throw fail(400, '图片大小不能超过 2MB')
+    return ok({ url: `https://picsum.photos/seed/upload${Date.now()}/400/300` })
   },
   'GET /admin/categories': (config) => {
     const user = currentUser(config)
